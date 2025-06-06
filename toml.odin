@@ -73,24 +73,31 @@ deep_delete :: proc(type: Type, allocator := context.allocator) -> (err: runtime
 
 // Retrieves and type checks the value at path. The last element of path is the actual key.
 // section may be any Table.
-get :: proc($T: typeid, section: ^Table, path: ..string) -> (val: T, ok: bool)
+
+Get_Error :: enum {None, DNE, Type}
+get :: proc($T: typeid, section: ^Table, path: ..string) -> (val: T, err: Get_Error)
     where intrinsics.type_is_variant_of(Type, T)
 {
     assert(len(path) > 0, "You must specify at least one path str in toml.fetch()!")
 	if section == nil {
-		return val, false
+		return val, .DNE
 	}
 
     section := section
     for dir in path[:len(path) - 1] {
         if dir in section {
-            section, ok = section[dir].(^Table)
-            if !ok do return val, false
-        } else do return val, false
+            section, ok := section[dir].(^Table)
+            if !ok do return val, .DNE
+        } else do return val, .DNE
     }
     last := path[len(path) - 1]
-    if last in section do return section[last].(T)
-    else do return val, false
+    if last in section {
+        if val, ok := section[last].(T); ok {
+            return val, .None
+        }
+        return val, .Type
+    }
+    return val, .DNE
 }
 
 // Also retrieves and typechecks the value at path, but if something goes wrong, it crashes the program.
@@ -145,19 +152,19 @@ print_value :: proc(v: Type, level := 0) {
 
 // Here lies the code for LSP:
 get_i64    :: proc(section: ^Table, path: ..string) -> 
-            (val: i64, ok: bool) { return get(i64, section, ..path) }
+            (val: i64, err: Get_Error) { return get(i64, section, ..path) }
 get_f64    :: proc(section: ^Table, path: ..string) -> 
-            (val: f64, ok: bool) { return get(f64, section, ..path) }
+            (val: f64, err: Get_Error) { return get(f64, section, ..path) }
 get_bool   :: proc(section: ^Table, path: ..string) -> 
-            (val: bool, ok: bool) { return get(bool, section, ..path) }
+            (val: bool, err: Get_Error) { return get(bool, section, ..path) }
 get_string :: proc(section: ^Table, path: ..string) -> 
-            (val: string, ok: bool) { return get(string, section, ..path) }
+            (val: string, err: Get_Error) { return get(string, section, ..path) }
 get_date   :: proc(section: ^Table, path: ..string) -> 
-            (val: dates.Date, ok: bool) { return get(dates.Date, section, ..path) }
+            (val: dates.Date, err: Get_Error) { return get(dates.Date, section, ..path) }
 get_list   :: proc(section: ^Table, path: ..string) -> 
-            (val: ^List, ok: bool) { return get(^List, section, ..path) } 
+            (val: ^List, err: Get_Error) { return get(^List, section, ..path) } 
 get_table  :: proc(section: ^Table, path: ..string) -> 
-            (val: ^Table, ok: bool) { return get(^Table, section, ..path) }
+            (val: ^Table, err: Get_Error) { return get(^Table, section, ..path) }
 
 get_i64_panic    :: proc(section: ^Table, path: ..string) -> 
             i64 { return get_panic(i64, section, ..path) }
